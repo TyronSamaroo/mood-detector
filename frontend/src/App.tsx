@@ -1,5 +1,11 @@
-import React, { useState, useEffect } from 'react';
-import './App.css';
+import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { ThemeProvider } from './contexts/ThemeContext';
+import ThemeToggle from './components/ThemeToggle';
+import Background3D from './components/Background3D';
+import TextInputPanel from './components/TextInputPanel';
+import MoodCard from './components/MoodCard';
+import { ArrowLeftIcon, GithubIcon } from './utils/IconWrappers';
 
 interface MoodResponse {
   mood: string;
@@ -7,103 +13,20 @@ interface MoodResponse {
   emotion_scores?: Record<string, number>;
 }
 
-const MOOD_EMOJIS: Record<string, string> = {
-  happy: '😊',
-  excited: '🤩',
-  loving: '❤️',
-  surprised: '😲',
-  neutral: '😐',
-  positive: '🙂',
-  negative: '🙁',
-  sad: '😔',
-  angry: '😠',
-  anxious: '😰',
-  disgusted: '🤢',
-  peaceful: '😌',
-  exhausted: '😴'
-};
-
-const MOOD_GRADIENTS: Record<string, string> = {
-  happy: 'linear-gradient(135deg, #43cea2 0%, #185a9d 100%)',
-  excited: 'linear-gradient(135deg, #FF8008 0%, #FFC837 100%)',
-  loving: 'linear-gradient(135deg, #FF5F6D 0%, #FFC371 100%)',
-  surprised: 'linear-gradient(135deg, #A770EF 0%, #FDB99B 100%)',
-  neutral: 'linear-gradient(135deg, #74ebd5 0%, #9face6 100%)',
-  positive: 'linear-gradient(135deg, #00b09b 0%, #96c93d 100%)',
-  negative: 'linear-gradient(135deg, #a8c0ff 0%, #3f2b96 100%)',
-  sad: 'linear-gradient(135deg, #8e9eab 0%, #eef2f3 100%)',
-  angry: 'linear-gradient(135deg, #f85032 0%, #e73827 100%)',
-  anxious: 'linear-gradient(135deg, #5614B0 0%, #DBD65C 100%)',
-  disgusted: 'linear-gradient(135deg, #4DA0B0 0%, #D39D38 100%)',
-  peaceful: 'linear-gradient(135deg, #2193b0 0%, #6dd5ed 100%)',
-  exhausted: 'linear-gradient(135deg, #bdc3c7 0%, #2c3e50 100%)'
-};
-
 function App() {
   const [text, setText] = useState('');
   const [moodData, setMoodData] = useState<MoodResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'input' | 'result'>(moodData ? 'result' : 'input');
-  const [typingEffect, setTypingEffect] = useState<string | null>(null);
-  const [currentTypingIndex, setCurrentTypingIndex] = useState(0);
-  const [isAnimating, setIsAnimating] = useState(false);
+  const [showResults, setShowResults] = useState(false);
 
-  // Examples to show in the placeholder
-  const examples = [
-    "I'm feeling so happy today! Everything is going great!",
-    "I'm really stressed about this deadline coming up.",
-    "I'm just feeling kind of neutral today, nothing special.",
-    "That movie made me so angry, I can't believe the ending!",
-    "I feel so peaceful after that meditation session."
-  ];
-  const [currentExampleIndex, setCurrentExampleIndex] = useState(0);
-  const [placeholderText, setPlaceholderText] = useState(examples[0]);
-
-  // Cycle through examples for the placeholder
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setCurrentExampleIndex((prevIndex) => (prevIndex + 1) % examples.length);
-    }, 5000);
-    return () => clearInterval(interval);
-  }, [examples.length]);
-
-  // Update placeholder text with animation
-  useEffect(() => {
-    setTypingEffect(examples[currentExampleIndex]);
-    setCurrentTypingIndex(0);
-  }, [currentExampleIndex]);
-
-  // Typing effect for placeholder
-  useEffect(() => {
-    if (typingEffect === null) return;
-    
-    if (currentTypingIndex < typingEffect.length) {
-      const timeout = setTimeout(() => {
-        setPlaceholderText(typingEffect.substring(0, currentTypingIndex + 1));
-        setCurrentTypingIndex(prev => prev + 1);
-      }, 50);
-      return () => clearTimeout(timeout);
-    }
-  }, [currentTypingIndex, typingEffect]);
-
-  // Switch tabs with animation
-  const switchTab = (tab: 'input' | 'result') => {
-    if (activeTab !== tab) {
-      setIsAnimating(true);
-      setTimeout(() => {
-        setActiveTab(tab);
-        setTimeout(() => setIsAnimating(false), 50);
-      }, 300);
-    }
-  };
-
-  const analyzeMood = async () => {
-    if (!text.trim()) {
+  const analyzeMood = async (inputText: string) => {
+    if (!inputText.trim()) {
       setError('Please enter some text to analyze');
       return;
     }
 
+    setText(inputText);
     setLoading(true);
     setError(null);
 
@@ -113,7 +36,7 @@ function App() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ text }),
+        body: JSON.stringify({ text: inputText }),
       });
 
       if (!response.ok) {
@@ -122,7 +45,7 @@ function App() {
 
       const data = await response.json();
       setMoodData(data);
-      switchTab('result');
+      setShowResults(true);
     } catch (err) {
       setError('Failed to connect to the mood analysis service. Please try again later.');
     } finally {
@@ -131,189 +54,99 @@ function App() {
   };
 
   const resetAnalysis = () => {
-    switchTab('input');
-    setText('');
-    // Keep the moodData to allow toggling back to results
-  };
-
-  // Get the top 3 emotions from the emotion scores
-  const getTopEmotions = () => {
-    if (!moodData?.emotion_scores) return [];
-    
-    return Object.entries(moodData.emotion_scores)
-      .sort(([, a], [, b]) => b - a)
-      .slice(0, 3);
-  };
-
-  // Handle keydown event for textarea
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    // Submit on Ctrl+Enter or Cmd+Enter
-    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-      analyzeMood();
-    }
+    setShowResults(false);
   };
 
   return (
-    <div 
-      className="app-container"
-      style={{
-        background: moodData 
-          ? MOOD_GRADIENTS[moodData.mood] || 'linear-gradient(135deg, #4b6cb7 0%, #182848 100%)'
-          : 'linear-gradient(135deg, #4b6cb7 0%, #182848 100%)'
-      }}
-    >
-      <div className="app-content">
-        <header className="app-header">
-          <h1 className="app-title">
-            <span className="emoji-title">🧠</span> Mood Detector
-          </h1>
-          <p className="app-subtitle">
+    <ThemeProvider>
+      {/* 3D animated background */}
+      <Background3D />
+      
+      {/* Theme toggle button */}
+      <ThemeToggle />
+      
+      <div className="min-h-screen relative z-10 flex flex-col items-center justify-center p-4 bg-gradient-to-br from-light-light/50 to-light-DEFAULT/50 dark:from-dark-DEFAULT/50 dark:to-dark-dark/50">
+        <motion.header 
+          className="mb-8 text-center"
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+        >
+          <motion.h1 
+            className="text-4xl md:text-5xl font-bold mb-2 bg-clip-text text-transparent bg-gradient-to-r from-primary-DEFAULT to-secondary-DEFAULT animate-gradient-x bg-size-200"
+          >
+            Mood Detector
+          </motion.h1>
+          <p className="text-lg text-dark-DEFAULT dark:text-light-DEFAULT">
             Analyze your emotions with advanced AI
           </p>
-        </header>
-
-        <div className="tab-container">
-          <div className="tab-buttons">
-            <button 
-              className={`tab-button ${activeTab === 'input' ? 'active' : ''}`} 
-              onClick={() => switchTab('input')}
-            >
-              Input
-            </button>
-            <button 
-              className={`tab-button ${activeTab === 'result' ? 'active' : ''}`} 
-              onClick={() => switchTab('result')}
-              disabled={!moodData}
-            >
-              Results
-            </button>
-          </div>
-
-          <div className="tab-content">
-            {activeTab === 'input' ? (
-              <div className={`input-panel ${isAnimating ? 'fade-out' : 'fade-in'}`}>
-                <div className="text-input-container">
-                  <textarea
-                    value={text}
-                    onChange={(e) => setText(e.target.value)}
-                    placeholder={placeholderText}
-                    rows={6}
-                    className="text-input"
-                    onKeyDown={handleKeyDown}
-                  />
-                  <div className="word-count">{text.trim().split(/\s+/).filter(Boolean).length} words</div>
-                  <p className="input-tip">Tip: Press Ctrl+Enter to analyze</p>
+        </motion.header>
+        
+        <main className="w-full max-w-4xl mx-auto">
+          <AnimatePresence mode="wait">
+            {showResults && moodData ? (
+              <motion.div
+                key="results"
+                initial={{ opacity: 0, x: 100 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -100 }}
+                transition={{ duration: 0.3 }}
+                className="w-full"
+              >
+                <div className="flex items-center mb-6">
+                  <motion.button
+                    onClick={resetAnalysis}
+                    className="flex items-center text-primary-DEFAULT hover:text-primary-dark dark:text-primary-light dark:hover:text-primary-DEFAULT transition-colors"
+                    whileHover={{ x: -5 }}
+                    whileTap={{ scale: 0.95 }}
+                  >
+                    <ArrowLeftIcon className="mr-2" />
+                    Back to Input
+                  </motion.button>
                 </div>
                 
-                <button
-                  onClick={analyzeMood}
-                  disabled={loading}
-                  className="analyze-button"
-                >
-                  {loading ? (
-                    <span className="loading-spinner"></span>
-                  ) : (
-                    <>
-                      <span className="button-text">Analyze Mood</span>
-                      <span className="button-icon">✨</span>
-                    </>
-                  )}
-                </button>
+                <MoodCard moodData={moodData} />
                 
-                {error && <div className="error-message">{error}</div>}
-              </div>
+                <div className="mt-6 bg-white/90 dark:bg-dark-DEFAULT/90 backdrop-blur-md rounded-xl shadow-lg p-6">
+                  <h3 className="text-lg font-bold mb-3 dark:text-light-light">Your Input</h3>
+                  <p className="text-dark-DEFAULT dark:text-light-DEFAULT bg-light-light dark:bg-dark-light p-4 rounded-lg italic">
+                    "{text}"
+                  </p>
+                </div>
+              </motion.div>
             ) : (
-              <div className={`result-panel ${isAnimating ? 'fade-out' : 'fade-in'}`}>
-                {moodData ? (
-                  <>
-                    <div className="mood-result">
-                      <div className="mood-emoji">{MOOD_EMOJIS[moodData.mood] || '😶'}</div>
-                      <h2 className="mood-title">
-                        {moodData.mood.charAt(0).toUpperCase() + moodData.mood.slice(1)}
-                      </h2>
-                      <div className="confidence-container">
-                        <p className="confidence-label">Confidence: {Math.round(moodData.confidence * 100)}%</p>
-                        <div className="confidence-bar">
-                          <div 
-                            className="confidence-level" 
-                            style={{ width: `${moodData.confidence * 100}%` }}
-                          ></div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {moodData.emotion_scores && (
-                      <div className="emotions-container">
-                        <h3 className="emotions-title">Top Emotions</h3>
-                        <div className="emotions-grid">
-                          {getTopEmotions().map(([emotion, score]) => (
-                            <div key={emotion} className="emotion-card">
-                              <div className="emotion-name">
-                                {emotion.charAt(0).toUpperCase() + emotion.slice(1)}
-                              </div>
-                              <div className="emotion-bar-container">
-                                <div 
-                                  className="emotion-bar" 
-                                  style={{ width: `${score * 100}%` }}
-                                ></div>
-                              </div>
-                              <div className="emotion-score">{Math.round(score * 100)}%</div>
-                            </div>
-                          ))}
-                        </div>
-
-                        <div className="full-emotions-breakdown">
-                          <h4 className="breakdown-title">Full Emotion Breakdown</h4>
-                          <div className="breakdown-grid">
-                            {Object.entries(moodData.emotion_scores)
-                              .sort(([, a], [, b]) => b - a)
-                              .map(([emotion, score]) => (
-                                <div key={emotion} className="breakdown-item">
-                                  <span className="breakdown-name">{emotion}</span>
-                                  <div className="breakdown-bar-container">
-                                    <div 
-                                      className="breakdown-bar" 
-                                      style={{ width: `${score * 100}%` }}
-                                    ></div>
-                                  </div>
-                                  <span className="breakdown-score">{Math.round(score * 100)}%</span>
-                                </div>
-                              ))}
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="analyzed-text">
-                      <h3 className="analyzed-text-title">Analyzed Text</h3>
-                      <div className="text-content">{text}</div>
-                    </div>
-
-                    <button onClick={resetAnalysis} className="new-analysis-button">
-                      <span className="button-text">New Analysis</span>
-                      <span className="button-icon">↻</span>
-                    </button>
-                  </>
-                ) : (
-                  <div className="no-results">
-                    <p>No mood analysis results yet.</p>
-                    <button onClick={() => switchTab('input')} className="go-to-input-button">
-                      Go to Input
-                    </button>
-                  </div>
-                )}
-              </div>
+              <motion.div
+                key="input"
+                initial={{ opacity: 0, x: -100 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: 100 }}
+                transition={{ duration: 0.3 }}
+              >
+                <TextInputPanel 
+                  onAnalyze={analyzeMood} 
+                  loading={loading} 
+                  error={error} 
+                />
+              </motion.div>
             )}
+          </AnimatePresence>
+        </main>
+        
+        <footer className="mt-8 text-center text-sm text-dark-DEFAULT/70 dark:text-light-DEFAULT/70">
+          <p>© {new Date().getFullYear()} Mood Detector</p>
+          <div className="flex justify-center mt-2">
+            <a 
+              href="https://github.com/yourusername/mood-detector" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="text-primary-DEFAULT hover:text-primary-dark dark:text-primary-light dark:hover:text-primary-DEFAULT flex items-center"
+            >
+              <GithubIcon className="mr-1" /> View on GitHub
+            </a>
           </div>
-        </div>
-
-        <footer className="app-footer">
-          <p>
-            Mood Detector using advanced emotion analysis AI
-          </p>
         </footer>
       </div>
-    </div>
+    </ThemeProvider>
   );
 }
 
