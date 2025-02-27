@@ -47,6 +47,7 @@ function App() {
   const [activeTab, setActiveTab] = useState<'input' | 'result'>(moodData ? 'result' : 'input');
   const [typingEffect, setTypingEffect] = useState<string | null>(null);
   const [currentTypingIndex, setCurrentTypingIndex] = useState(0);
+  const [isAnimating, setIsAnimating] = useState(false);
 
   // Examples to show in the placeholder
   const examples = [
@@ -86,6 +87,17 @@ function App() {
     }
   }, [currentTypingIndex, typingEffect]);
 
+  // Switch tabs with animation
+  const switchTab = (tab: 'input' | 'result') => {
+    if (activeTab !== tab) {
+      setIsAnimating(true);
+      setTimeout(() => {
+        setActiveTab(tab);
+        setTimeout(() => setIsAnimating(false), 50);
+      }, 300);
+    }
+  };
+
   const analyzeMood = async () => {
     if (!text.trim()) {
       setError('Please enter some text to analyze');
@@ -110,7 +122,7 @@ function App() {
 
       const data = await response.json();
       setMoodData(data);
-      setActiveTab('result');
+      switchTab('result');
     } catch (err) {
       setError('Failed to connect to the mood analysis service. Please try again later.');
     } finally {
@@ -119,7 +131,7 @@ function App() {
   };
 
   const resetAnalysis = () => {
-    setActiveTab('input');
+    switchTab('input');
     setText('');
     // Keep the moodData to allow toggling back to results
   };
@@ -164,13 +176,13 @@ function App() {
           <div className="tab-buttons">
             <button 
               className={`tab-button ${activeTab === 'input' ? 'active' : ''}`} 
-              onClick={() => setActiveTab('input')}
+              onClick={() => switchTab('input')}
             >
               Input
             </button>
             <button 
               className={`tab-button ${activeTab === 'result' ? 'active' : ''}`} 
-              onClick={() => setActiveTab('result')}
+              onClick={() => switchTab('result')}
               disabled={!moodData}
             >
               Results
@@ -179,7 +191,7 @@ function App() {
 
           <div className="tab-content">
             {activeTab === 'input' ? (
-              <div className="input-panel">
+              <div className={`input-panel ${isAnimating ? 'fade-out' : 'fade-in'}`}>
                 <div className="text-input-container">
                   <textarea
                     value={text}
@@ -208,23 +220,19 @@ function App() {
                   )}
                 </button>
                 
-                {error && <p className="error-message">{error}</p>}
+                {error && <div className="error-message">{error}</div>}
               </div>
             ) : (
-              <div className="result-panel">
+              <div className={`result-panel ${isAnimating ? 'fade-out' : 'fade-in'}`}>
                 {moodData ? (
                   <>
                     <div className="mood-result">
-                      <div className="mood-emoji">
-                        {MOOD_EMOJIS[moodData.mood] || '🤔'}
-                      </div>
+                      <div className="mood-emoji">{MOOD_EMOJIS[moodData.mood] || '😶'}</div>
                       <h2 className="mood-title">
                         {moodData.mood.charAt(0).toUpperCase() + moodData.mood.slice(1)}
                       </h2>
                       <div className="confidence-container">
-                        <div className="confidence-label">
-                          Confidence: {Math.round(moodData.confidence * 100)}%
-                        </div>
+                        <p className="confidence-label">Confidence: {Math.round(moodData.confidence * 100)}%</p>
                         <div className="confidence-bar">
                           <div 
                             className="confidence-level" 
@@ -234,41 +242,41 @@ function App() {
                       </div>
                     </div>
 
-                    {moodData.emotion_scores && Object.keys(moodData.emotion_scores).length > 0 && (
+                    {moodData.emotion_scores && (
                       <div className="emotions-container">
-                        <h3 className="emotions-title">Emotion Analysis</h3>
+                        <h3 className="emotions-title">Top Emotions</h3>
                         <div className="emotions-grid">
                           {getTopEmotions().map(([emotion, score]) => (
-                            <div className="emotion-card" key={emotion}>
+                            <div key={emotion} className="emotion-card">
                               <div className="emotion-name">
                                 {emotion.charAt(0).toUpperCase() + emotion.slice(1)}
                               </div>
                               <div className="emotion-bar-container">
                                 <div 
                                   className="emotion-bar" 
-                                  style={{ width: `${Math.min(score * 10, 100)}%` }}
+                                  style={{ width: `${score * 100}%` }}
                                 ></div>
                               </div>
-                              <div className="emotion-score">{score.toFixed(1)}</div>
+                              <div className="emotion-score">{Math.round(score * 100)}%</div>
                             </div>
                           ))}
                         </div>
-                        
+
                         <div className="full-emotions-breakdown">
-                          <h4 className="breakdown-title">Full Breakdown</h4>
+                          <h4 className="breakdown-title">Full Emotion Breakdown</h4>
                           <div className="breakdown-grid">
                             {Object.entries(moodData.emotion_scores)
                               .sort(([, a], [, b]) => b - a)
                               .map(([emotion, score]) => (
-                                <div className="breakdown-item" key={emotion}>
+                                <div key={emotion} className="breakdown-item">
                                   <span className="breakdown-name">{emotion}</span>
                                   <div className="breakdown-bar-container">
                                     <div 
                                       className="breakdown-bar" 
-                                      style={{ width: `${Math.min(score * 10, 100)}%` }}
+                                      style={{ width: `${score * 100}%` }}
                                     ></div>
                                   </div>
-                                  <span className="breakdown-score">{score.toFixed(1)}</span>
+                                  <span className="breakdown-score">{Math.round(score * 100)}%</span>
                                 </div>
                               ))}
                           </div>
@@ -278,26 +286,18 @@ function App() {
 
                     <div className="analyzed-text">
                       <h3 className="analyzed-text-title">Analyzed Text</h3>
-                      <div className="text-content">
-                        "{text}"
-                      </div>
+                      <div className="text-content">{text}</div>
                     </div>
 
-                    <button
-                      onClick={resetAnalysis}
-                      className="new-analysis-button"
-                    >
+                    <button onClick={resetAnalysis} className="new-analysis-button">
                       <span className="button-text">New Analysis</span>
-                      <span className="button-icon">✏️</span>
+                      <span className="button-icon">↻</span>
                     </button>
                   </>
                 ) : (
                   <div className="no-results">
-                    <p>No analysis results yet. Enter some text and click "Analyze Mood".</p>
-                    <button 
-                      onClick={() => setActiveTab('input')}
-                      className="go-to-input-button"
-                    >
+                    <p>No mood analysis results yet.</p>
+                    <button onClick={() => switchTab('input')} className="go-to-input-button">
                       Go to Input
                     </button>
                   </div>
@@ -308,7 +308,9 @@ function App() {
         </div>
 
         <footer className="app-footer">
-          <p> 2025 Mood Detector | Powered by TextBlob and NLP | <a href="https://github.com/your-username/mood-detector" target="_blank" rel="noopener noreferrer">GitHub</a></p>
+          <p>
+            Mood Detector using advanced emotion analysis AI
+          </p>
         </footer>
       </div>
     </div>
